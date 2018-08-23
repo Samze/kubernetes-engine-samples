@@ -21,10 +21,10 @@ import (
 	"html"
 	"log"
 	"net/http"
-	"os"
 	"sync"
 
 	"cloud.google.com/go/pubsub"
+	cfenv "github.com/cloudfoundry-community/go-cfenv"
 	"golang.org/x/net/context"
 )
 
@@ -62,14 +62,24 @@ func main() {
 }
 
 func receiveMessages(ctx context.Context) {
-	projectID := os.Getenv(gcpProjectEnvName)
-	if projectID == "" {
-		log.Fatalf("Couldn't find %s in env", gcpProjectEnvName)
+	appEnv, err := cfenv.Current()
+	if err != nil {
+		log.Fatalf("Couldn't find appenv %+v", err)
 	}
 
-	subName := os.Getenv(pubsubSubEnvName)
-	if subName == "" {
-		log.Fatalf("Couldn't find %s in env", pubsubSubEnvName)
+	service, err := appEnv.Services.WithName("gcp-pubsub")
+	if err != nil {
+		log.Fatalf("Couldn't find service %+v", err)
+	}
+
+	projectID, ok := service.CredentialString("projectId")
+	if !ok {
+		log.Fatalf("Couldn't find project id %+v", ok)
+	}
+
+	subID, ok := service.CredentialString("subscriptionId")
+	if !ok {
+		log.Fatalf("Couldn't find sub id %+v", ok)
 	}
 
 	client, err := pubsub.NewClient(ctx, projectID)
@@ -77,14 +87,14 @@ func receiveMessages(ctx context.Context) {
 		log.Fatalf("Failed to create client: %v", err)
 	}
 
-	sub := client.Subscription(subName)
+	sub := client.Subscription(subID)
 
-	ok, err := sub.Exists(ctx)
+	ok, err = sub.Exists(ctx)
 	if err != nil {
-		log.Fatalf("Error finding subscription %s: %v", subName, err)
+		log.Fatalf("Error finding subscription %s: %v", subID, err)
 	}
 	if !ok {
-		log.Fatalf("Couldn't find subscription %v", subName)
+		log.Fatalf("Couldn't find subscription %v", subID)
 	}
 
 	err = sub.Receive(ctx, func(ctx context.Context, m *pubsub.Message) {

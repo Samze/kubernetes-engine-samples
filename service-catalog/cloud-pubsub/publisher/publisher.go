@@ -17,12 +17,15 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
 
 	"cloud.google.com/go/pubsub"
+	cfenv "github.com/cloudfoundry-community/go-cfenv"
 	"golang.org/x/net/context"
 )
 
@@ -37,15 +40,58 @@ var topic *pubsub.Topic
 func main() {
 	ctx := context.Background()
 
-	projectID := os.Getenv(gcpProjectEnvName)
-	if projectID == "" {
-		log.Fatalf("Couldn't find %s in env", gcpProjectEnvName)
+	appEnv, err := cfenv.Current()
+	if err != nil {
+		log.Fatalf("Couldn't find env %+v", err)
 	}
 
-	topicName := os.Getenv(pubsubTopicEnvName)
-	if topicName == "" {
-		log.Fatalf("Couldn't find %s in env", pubsubTopicEnvName)
+	service, err := appEnv.Services.WithName("gcp-pubsub")
+	if err != nil {
+		log.Fatalf("Couldn't find env %+v", err)
 	}
+
+	projectID, ok := service.CredentialString("projectId")
+	if !ok {
+		log.Fatalf("Couldn't find project id %+v", ok)
+	}
+
+	topicId, ok := service.CredentialString("topicId")
+	if !ok {
+		log.Fatalf("Couldn't find topic id %+v", ok)
+	}
+
+	key, ok := service.CredentialString("privateKeyData")
+	if !ok {
+		log.Fatalf("Couldn't find key i%+v", ok)
+	}
+
+	data := map[string]string{}
+
+	err = json.Unmarshal([]byte(key), &data)
+
+	if err != nil {
+		log.Fatalf("could not unmasrahl %+v", err)
+	}
+
+	content := []byte(key)
+	tmpfile, err := ioutil.TempFile("", "key")
+	if err != nil {
+		log.Fatal(err)
+	}
+	if _, err := tmpfile.Write(content); err != nil {
+		log.Fatal(err)
+	}
+	if err := tmpfile.Close(); err != nil {
+		log.Fatal(err)
+	}
+
+	fmt.Println(tmpfile.Name())
+
+	defer os.Remove(tmpfile.Name())
+
+	os.Setenv("GOOGLE_APPLICATION_CREDENTIALS", tmpfile.Name())
+
+	fmt.Println(os.Getenv("GOOGLE_APPLICATION_CREDENTIALS"))
 
 	client, err := pubsub.NewClient(ctx, projectID)
 	if err != nil {
@@ -53,10 +99,10 @@ func main() {
 	}
 	log.Println("Created client")
 
-	topic = client.Topic(topicName)
+	topic = client.Topic(topicId)
 
 	// The topic existence test requires the binding to have the 'viewer' role.
-	ok, err := topic.Exists(ctx)
+	ok, err = topic.Exists(ctx)
 	if err != nil {
 		log.Fatalf("Error finding topic: %v", err)
 	}
