@@ -17,7 +17,6 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -45,7 +44,7 @@ func main() {
 		log.Fatalf("Couldn't find env %+v", err)
 	}
 
-	service, err := appEnv.Services.WithName("gcp-pubsub")
+	service, err := appEnv.Services.WithName("pubsub")
 	if err != nil {
 		log.Fatalf("Couldn't find env %+v", err)
 	}
@@ -63,14 +62,6 @@ func main() {
 	key, ok := service.CredentialString("privateKeyData")
 	if !ok {
 		log.Fatalf("Couldn't find key i%+v", ok)
-	}
-
-	data := map[string]string{}
-
-	err = json.Unmarshal([]byte(key), &data)
-
-	if err != nil {
-		log.Fatalf("could not unmasrahl %+v", err)
 	}
 
 	content := []byte(key)
