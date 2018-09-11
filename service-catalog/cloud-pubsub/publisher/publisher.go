@@ -76,13 +76,9 @@ func main() {
 		log.Fatal(err)
 	}
 
-	fmt.Println(tmpfile.Name())
-
 	defer os.Remove(tmpfile.Name())
 
 	os.Setenv("GOOGLE_APPLICATION_CREDENTIALS", tmpfile.Name())
-
-	fmt.Println(os.Getenv("GOOGLE_APPLICATION_CREDENTIALS"))
 
 	client, err := pubsub.NewClient(ctx, projectID)
 	if err != nil {
